@@ -11,6 +11,7 @@ void client_func() {
 	tcp::resolver resolver(io);
 	tcp::acceptor acceptor(io, tcp::endpoint(tcp::v4(), 8080));
 	tcp::socket socket(io);
+	boost::asio::connect(socket, resolver.resolve("127.0.0.1", "8080"));
 
 	std::string input_name;
 	char reply[1024];
@@ -20,7 +21,6 @@ void client_func() {
 			std::cout << "What is your name?: ";
 			std::getline(std::cin, input_name);
 		} while (input_name.length() == 0);
-		boost::asio::connect(socket, resolver.resolve("127.0.0.1", "8080"));
 		boost::asio::write(socket, boost::asio::buffer(input_name.c_str(), input_name.size()));
 		for (;;) {
 			reply_length = socket.read_some(boost::asio::buffer(reply));
@@ -28,7 +28,6 @@ void client_func() {
 				break;
 			}
 		}
-		socket.close();
 		for (int i = 0; i < reply_length; ++i) {
 			std::cout << reply[i];
 		}
@@ -43,11 +42,16 @@ void server() {
 	std::string reply("Hello ");
 	char req[1024];
 	int req_length;
-	while (true) {
-		acceptor.async_accept([&req, &req_length, &reply](const boost::system::error_code& error, tcp::socket socket) {
+	acceptor.async_accept([&req, &req_length, &reply](const boost::system::error_code& error, tcp::socket socket) {
+		while (true) {
 			if (!error) {
 				for (;;) {
-					req_length = socket.read_some(boost::asio::buffer(req));
+					try {
+						req_length = socket.read_some(boost::asio::buffer(req));
+					}
+					catch (const std::exception& e) {
+						std::cout << e.what();
+					}
 					if (req_length != 0) {
 						break;
 					}
@@ -56,9 +60,9 @@ void server() {
 				boost::asio::write(socket, boost::asio::buffer(reply.c_str(), reply.size()));
 				reply.erase(6, req_length);
 			}
-			});
-		io.run();
-	}
+		}
+		});
+	io.run();
 }
 
 int main() {
