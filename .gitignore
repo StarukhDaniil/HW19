@@ -2,3 +2,4 @@
 out/
 build/
 *.bat
+external/*_build
