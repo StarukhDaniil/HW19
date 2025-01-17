@@ -1,30 +1,71 @@
 #include <iostream>
-#include <boost/program_options.hpp>
+#include <string>
+#include <thread>
+#include <chrono>
+#include <boost/asio.hpp>
 
-int main(int argc, char* argv[]) {
-	try {
-		boost::program_options::options_description desc("Allowed options");
-		desc.add_options()
-			("help,h", "Help message")
-			("name,n", boost::program_options::value<std::string>(), "Your name")
-			("age,a", boost::program_options::value<int>(), "Your age");
-		boost::program_options::variables_map vm;
-		boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
-		vm.notify();
+using boost::asio::ip::tcp;
 
-		if (vm.count("help")) {
-			std::cout << desc << std::endl;
+void client_func() {
+	boost::asio::io_context io;
+	tcp::resolver resolver(io);
+	tcp::acceptor acceptor(io, tcp::endpoint(tcp::v4(), 8080));
+	tcp::socket socket(io);
+
+	std::string input_name;
+	char reply[1024];
+	int reply_length;
+	while (true) {
+		do {
+			std::cout << "What is your name?: ";
+			std::getline(std::cin, input_name);
+		} while (input_name.length() == 0);
+		boost::asio::connect(socket, resolver.resolve("127.0.0.1", "8080"));
+		boost::asio::write(socket, boost::asio::buffer(input_name.c_str(), input_name.size()));
+		for (;;) {
+			reply_length = socket.read_some(boost::asio::buffer(reply));
+			if (reply_length != 0) {
+				break;
+			}
 		}
-		if (vm.count("name")) {
-			std::cout << "Your name is " << vm["name"].as<std::string>() << std::endl;
+		socket.close();
+		for (int i = 0; i < reply_length; ++i) {
+			std::cout << reply[i];
 		}
-		if (vm.count("age")) {
-			std::cout << "Your age is " << vm["age"].as<int>() << std::endl;
-		}
+		std::cout << std::endl;
 	}
-	catch (const std::exception& e) {
-		std::cout << e.what() << std::endl;
-		return 1;
+}
+
+void server() {
+	boost::asio::io_context io;
+	tcp::acceptor acceptor(io, tcp::endpoint(tcp::v4(), 8080));
+
+	std::string reply("Hello ");
+	char req[1024];
+	int req_length;
+	while (true) {
+		acceptor.async_accept([&req, &req_length, &reply](const boost::system::error_code& error, tcp::socket socket) {
+			if (!error) {
+				for (;;) {
+					req_length = socket.read_some(boost::asio::buffer(req));
+					if (req_length != 0) {
+						break;
+					}
+				}
+				reply.append(req, req_length);
+				boost::asio::write(socket, boost::asio::buffer(reply.c_str(), reply.size()));
+				reply.erase(6, req_length);
+			}
+			});
+		io.run();
+	}
+}
+
+int main() {
+	std::thread client(&client_func);
+	server();
+	if (client.joinable()) {
+		client.join();
 	}
 	return 0;
 }

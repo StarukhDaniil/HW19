@@ -3,11 +3,12 @@ project(hello_boost)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(BOOST_ROOT ${CMAKE_SOURCE_DIR}/external/boost)
 add_subdirectory(${BOOST_ROOT} external/boost_build)
 
-find_package(Boost REQUIRED COMPONENTS program_options)
+find_package(Boost)
 
 if(Boost_FOUND)
 	include_directories(${Boost_INCLUDE_DIRS})
@@ -17,4 +18,4 @@ endif()
 
 add_executable(hw19 main.cpp)
 
-target_link_libraries(hw19 Boost::program_options)
+target_link_libraries(hw19 Boost::asio)
